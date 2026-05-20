@@ -1,0 +1,22 @@
+# Secretos — nunca a git
+.env
+firebase-service-account.json
+google-services.json
+GoogleService-Info.plist
+
+# Dependencias
+node_modules/
+
+# Expo / Metro
+.expo/
+dist/
+
+# Logs
+*.log
+npm-debug.log*
+
+# macOS
+.DS_Store
+
+# Claude Code
+.claude/

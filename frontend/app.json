@@ -1,0 +1,53 @@
+{
+  "expo": {
+    "name": "Cuervo",
+    "slug": "cuervo-app",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "dark",
+    "icon": "./assets/icon.png",
+    "splash": {
+      "resizeMode": "contain",
+      "backgroundColor": "#0a0a0a"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.yourname.cuervo",
+      "infoPlist": {
+        "NSCameraUsageDescription": "Se necesita la cámara para escanear el código QR del evento"
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#0a0a0a"
+      },
+      "package": "com.yourname.cuervo",
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.RECEIVE_BOOT_COMPLETED",
+        "android.permission.VIBRATE"
+      ],
+      "googleServicesFile": "./google-services.json"
+    },
+    "plugins": [
+      [
+        "expo-notifications",
+        {
+          "color": "#6366f1"
+        }
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Se necesita la cámara para escanear el código QR del evento"
+        }
+      ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "REEMPLAZA_CON_TU_EXPO_PROJECT_ID"
+      }
+    }
+  }
+}
