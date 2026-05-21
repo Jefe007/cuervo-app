@@ -22,9 +22,10 @@ pool.on('error', (err) => console.error('[DB] Error inesperado:', err.message));
 let firebaseReady = false;
 
 try {
-  admin.initializeApp({
-    credential: admin.credential.cert(require('./firebase-service-account.json')),
-  });
+  const serviceAccount = process.env.FIREBASE_SERVICE_ACCOUNT
+    ? JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT)   // Railway: variable de entorno
+    : require('./firebase-service-account.json');          // Local: archivo en disco
+  admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
   firebaseReady = true;
   console.log('[Firebase] Admin SDK inicializado');
 } catch (err) {
