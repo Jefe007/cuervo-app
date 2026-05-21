@@ -16,7 +16,7 @@ import { CameraView, useCameraPermissions } from 'expo-camera';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 
-const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000';
+const API_URL = process.env.EXPO_PUBLIC_API_URL || 'https://cuervo-backend-production.up.railway.app';
 
 export default function RegisterScreen({ navigation }) {
   const [email, setEmail] = useState('');
