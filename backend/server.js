@@ -130,6 +130,31 @@ app.post('/api/events', async (req, res) => {
   }
 });
 
+// Página pública del evento — para cuando alguien escanea el QR con la cámara del móvil
+app.get('/event/:id', async (req, res) => {
+  try {
+    const result = await pool.query('SELECT * FROM events WHERE id = $1', [req.params.id]);
+    if (result.rows.length === 0) {
+      return res.status(404).send('<h2>Evento no encontrado</h2>');
+    }
+    const ev = result.rows[0];
+    res.send(`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>${ev.name} – Cuervo</title>
+<style>body{font-family:sans-serif;max-width:480px;margin:60px auto;padding:0 24px;background:#0a0a0a;color:#fff}
+h1{color:#6366f1}p{color:#aaa}a{display:block;margin-top:32px;background:#6366f1;color:#fff;padding:16px;border-radius:12px;text-align:center;text-decoration:none;font-weight:bold}</style>
+</head><body>
+<h1>${ev.name}</h1>
+<p>${ev.description || ''}</p>
+<p>Abre la app <strong>Cuervo</strong> en tu teléfono, escanea el QR del evento y recibirás notificaciones push.</p>
+<a href="https://expo.dev/go">Descargar Expo Go</a>
+</body></html>`);
+  } catch (err) {
+    console.error('[Event page] Error:', err.message);
+    res.status(500).send('<h2>Error del servidor</h2>');
+  }
+});
+
 // Obtener evento por ID
 app.get('/api/events/:id', async (req, res) => {
   try {

@@ -52,7 +52,18 @@ export default function RegisterScreen({ navigation }) {
     setScanned(true);
     setShowScanner(false);
 
-    const eventId = data.trim();
+    let eventId = data.trim();
+
+    // Si el QR contiene una URL, extrae el último segmento como event_id
+    // Ej: https://cuervo-backend-production.up.railway.app/event/test-event-01 → test-event-01
+    try {
+      const url = new URL(eventId);
+      const segments = url.pathname.split('/').filter(Boolean);
+      if (segments.length > 0) eventId = segments[segments.length - 1];
+    } catch {
+      // No es URL, usar el texto directamente
+    }
+
     if (!eventId) {
       Alert.alert('QR inválido', 'No se pudo leer el ID del evento.');
       return;
