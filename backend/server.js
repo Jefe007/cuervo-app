@@ -6,6 +6,7 @@ const rateLimit = require('express-rate-limit');
 
 const app = express();
 app.use(express.json());
+app.set('trust proxy', 1);
 
 // ─── PostgreSQL ───────────────────────────────────────────────────────────────
 
@@ -207,12 +208,45 @@ app.post('/api/events/:id/subscribe', async (req, res) => {
   }
 });
 
+// Enviar via Expo Push API (tokens ExponentPushToken[...])
+async function sendExpoNotifications(expoTokens, title, body, event_id) {
+  const messages = expoTokens.map((token) => ({
+    to: token,
+    title,
+    body,
+    data: { event_id },
+    sound: 'default',
+  }));
+
+  const response = await fetch('https://exp.host/--/api/v2/push/send', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify(messages),
+  });
+
+  const result = await response.json();
+  const receipts = Array.isArray(result.data) ? result.data : [result.data];
+  const sent = receipts.filter((r) => r?.status === 'ok').length;
+  const failed = receipts.length - sent;
+  return { sent, failed, receipts };
+}
+
+// Enviar via Firebase Admin SDK (tokens FCM nativos)
+async function sendFcmNotifications(fcmTokens, title, body, event_id) {
+  const fcmResponse = await admin.messaging().sendEachForMulticast({
+    notification: { title, body },
+    data: { event_id },
+    tokens: fcmTokens,
+  });
+  return {
+    sent: fcmResponse.successCount,
+    failed: fcmResponse.failureCount,
+    receipts: fcmResponse.responses.map((r) => ({ status: r.success ? 'ok' : 'error', error: r.error?.code })),
+  };
+}
+
 // Enviar notificación push a todos los suscriptores de un evento
 app.post('/api/events/:id/notify', async (req, res) => {
-  if (!firebaseReady) {
-    return res.status(503).json({ error: 'Firebase no está configurado en el servidor' });
-  }
-
   const { id: event_id } = req.params;
   const { title, body } = req.body;
 
@@ -236,36 +270,39 @@ app.post('/api/events/:id/notify', async (req, res) => {
       return res.json({ message: 'Sin suscriptores para este evento', sent: 0, failed: 0 });
     }
 
-    const tokens = usersResult.rows.map((r) => r.firebase_token);
+    // Separar tokens por tipo: Expo Go vs FCM nativo
+    const expoTokens = usersResult.rows.filter((r) => r.firebase_token.startsWith('ExponentPushToken')).map((r) => r.firebase_token);
+    const fcmTokens  = usersResult.rows.filter((r) => !r.firebase_token.startsWith('ExponentPushToken')).map((r) => r.firebase_token);
 
-    const fcmResponse = await admin.messaging().sendEachForMulticast({
-      notification: { title, body },
-      data: { event_id },
-      tokens,
-    });
+    let totalSent = 0;
+    let totalFailed = 0;
 
-    // Registrar resultado de cada notificación
-    const inserts = usersResult.rows.map((row, i) => {
-      const success = fcmResponse.responses[i].success;
-      const errorCode = fcmResponse.responses[i].error?.code || null;
-      return pool.query(
-        `INSERT INTO notifications (event_id, firebase_token, title, body, status, error_code)
-         VALUES ($1, $2, $3, $4, $5, $6)`,
-        [event_id, row.firebase_token, title, body, success ? 'sent' : 'failed', errorCode]
-      );
-    });
+    if (expoTokens.length > 0) {
+      const { sent, failed } = await sendExpoNotifications(expoTokens, title, body, event_id);
+      totalSent += sent;
+      totalFailed += failed;
+      console.log(`[Notify/Expo] ${sent} enviados, ${failed} fallidos`);
+    }
 
+    if (fcmTokens.length > 0 && firebaseReady) {
+      const { sent, failed } = await sendFcmNotifications(fcmTokens, title, body, event_id);
+      totalSent += sent;
+      totalFailed += failed;
+      console.log(`[Notify/FCM] ${sent} enviados, ${failed} fallidos`);
+    }
+
+    // Registrar en BD
+    const inserts = usersResult.rows.map((row) =>
+      pool.query(
+        `INSERT INTO notifications (event_id, firebase_token, title, body, status)
+         VALUES ($1, $2, $3, $4, 'sent')`,
+        [event_id, row.firebase_token, title, body]
+      )
+    );
     await Promise.allSettled(inserts);
 
-    console.log(
-      `[Notify] Evento ${event_id}: ${fcmResponse.successCount} enviados, ${fcmResponse.failureCount} fallidos`
-    );
-
-    res.json({
-      sent: fcmResponse.successCount,
-      failed: fcmResponse.failureCount,
-      total: tokens.length,
-    });
+    console.log(`[Notify] Evento ${event_id}: ${totalSent} enviados, ${totalFailed} fallidos`);
+    res.json({ sent: totalSent, failed: totalFailed, total: usersResult.rows.length });
   } catch (err) {
     console.error('[Notify] Error:', err.message);
     res.status(500).json({ error: 'Error al enviar notificaciones' });
